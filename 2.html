@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Style3D EDU - 赛事统筹管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef5ff',
+                            100: '#e0edff',
+                            200: '#cce0ff',
+                            300: '#a3c8ff',
+                            400: '#70a7ff',
+                            500: '#4592FF', /* Style3D EDU 品牌色 */
+                            600: '#2b75ff',
+                            700: '#1a5ef5',
+                            800: '#184bcc',
+                            900: '#1842a2',
+                            950: '#122a63',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'float': '0 10px 30px -5px rgba(69, 146, 255, 0.2)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hide-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .hide-scroll::-webkit-scrollbar-track { background: transparent; }
+        .hide-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .hide-scroll::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+        .btn-move { opacity: 0; transition: opacity 0.2s; }
+        .group:hover .btn-move { opacity: 1; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen selection:bg-brand-200 selection:text-brand-900">
+
+    <header class="bg-white shadow-sm sticky top-0 z-40 border-b border-gray-100">
+        <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-md">
+                    <span class="text-white font-black text-xl leading-none">S</span>
+                </div>
+                <h1 class="text-xl font-black text-gray-800 tracking-tight">Style3D EDU <span class="font-normal text-gray-400 text-sm ml-2">| 赛事排期大盘</span></h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="relative group">
+                    <input type="text" id="globalSearch" placeholder="搜索赛事 / 负责人 / 任务..." 
+                           class="w-64 pl-10 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-sm focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-all"
+                           onkeyup="renderData()">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-500 transition-colors">🔍</span>
+                </div>
+                <button onclick="exportExcel()" class="text-sm font-medium text-gray-600 hover:text-brand-600 bg-gray-50 hover:bg-brand-50 px-4 py-1.5 rounded-full border border-gray-200 transition-colors flex items-center gap-1">
+                    <span>⬇️</span> 导出排期
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-[1600px] mx-auto px-6 py-8">
+        <div class="flex flex-col xl:flex-row gap-6">
+            
+            <div class="flex-1 space-y-6 min-w-[60%]">
+                
+                <section class="bg-white rounded-2xl shadow-soft border-t-4 border-brand-500 p-6">
+                    <div class="flex justify-between items-end mb-6">
+                        <div>
+                            <h2 class="text-lg font-black text-gray-800">全景时间轴</h2>
+                            <p class="text-xs text-gray-400 mt-1">全局赛事周期一览</p>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto hide-scroll pb-4">
+                        <div id="timelineContainer" class="min-w-[800px] relative"></div>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-2xl shadow-soft p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-black text-gray-800">赛事排期明细</h2>
+                        <button onclick="sortByDate()" class="text-xs text-brand-600 hover:text-brand-800 bg-brand-50 px-3 py-1.5 rounded-md font-medium transition-colors">
+                            按近期开始时间排序
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto hide-scroll border border-gray-100 rounded-xl">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-500 font-bold border-b border-gray-100 uppercase text-xs">
+                                <tr>
+                                    <th class="py-3 px-4 w-12 text-center">排序</th>
+                                    <th class="py-3 px-4 w-24">状态</th>
+                                    <th class="py-3 px-4 min-w-[180px]">大赛名称</th>
+                                    <th class="py-3 px-4 w-24">总负责人</th>
+                                    <th class="py-3 px-4 min-w-[400px]">执行阶段排期</th>
+                                    <th class="py-3 px-4 w-28 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-gray-50"></tbody>
+                        </table>
+                        <div id="emptyState" class="hidden text-center py-16 text-gray-400">
+                            <div class="text-4xl mb-2">📭</div>
+                            <p>暂无赛事数据，请在下方录入</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="eventFormSection" class="bg-white rounded-2xl shadow-soft border border-gray-100 p-6">
+                    <h2 class="text-lg font-black text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="w-1.5 h-5 bg-brand-500 rounded-full"></span>赛事录入 / 编辑器
+                    </h2>
+                    <form id="eventForm" class="space-y-6">
+                        <input type="hidden" id="editId">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-600 mb-1.5">大赛名称 <span class="text-red-500">*</span></label>
+                                <input type="text" id="name" required class="w-full p-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow shadow-sm bg-white" placeholder="如：2026全国3D设计大赛">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-600 mb-1.5">总负责人 <span class="text-red-500">*</span></label>
+                                <input type="text" id="main_owner" required class="w-full p-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow shadow-sm bg-white" placeholder="输入姓名">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-gray-600 mb-1.5">全局备注</label>
+                                <textarea id="notes" rows="2" class="w-full p-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow shadow-sm bg-white resize-none" placeholder="输入赛事的总体目标、重点关注项等..."></textarea>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-3">
+                                <label class="block text-sm font-bold text-gray-800">执行阶段设置</label>
+                                <button type="button" onclick="addPhase()" class="text-xs bg-brand-50 text-brand-600 hover:bg-brand-100 font-bold px-3 py-1.5 rounded-md transition-colors">+ 新增执行阶段</button>
+                            </div>
+                            <div id="phasesContainer" class="space-y-3"></div>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-100 flex flex-col md:flex-row justify-end gap-3">
+                            <button type="button" onclick="resetForm()" class="px-6 py-2.5 text-sm font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors w-full md:w-auto">清空 / 取消</button>
+                            <button type="button" onclick="saveEvent()" class="px-8 py-2.5 rounded-lg bg-brand-500 text-white text-sm font-bold shadow-md hover:bg-brand-600 hover:shadow-float transition-all w-full md:w-auto">
+                                保存完整排期
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+            </div>
+
+            <aside class="w-full xl:w-[25%] xl:min-w-[320px] max-w-sm shrink-0">
+                <div class="bg-white rounded-2xl shadow-soft border-t-4 border-brand-800 flex flex-col h-full xl:h-[calc(100vh-8rem)] xl:sticky xl:top-6">
+                    <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl">
+                        <h2 class="text-base font-bold text-brand-900 tracking-wide">待办任务看板</h2>
+                        <span class="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-bold" id="todoCount">0 项</span>
+                    </div>
+                    
+                    <div class="p-4 flex-1 overflow-y-auto hide-scroll bg-gray-50/30">
+                        <div id="todoContainer" class="space-y-3"></div>
+                    </div>
+                </div>
+            </aside>
+
+        </div>
+    </div>
+
+    <div id="eventDetailModal" class="fixed inset-0 bg-gray-900/60 z-50 hidden flex items-center justify-center backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col m-4 border border-gray-200">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/80">
+                <div class="pr-8">
+                    <h2 id="modalTitle" class="text-2xl font-black text-brand-900 leading-tight">大赛名称</h2>
+                    <p id="modalOwner" class="text-sm font-medium text-gray-500 mt-2 bg-white inline-block px-3 py-1 rounded shadow-sm border border-gray-100">负责人: </p>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 text-3xl font-light leading-none p-1 transition-colors">&times;</button>
+            </div>
+            <div id="modalContent" class="p-6 overflow-y-auto flex-1 bg-white"></div>
+            <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                <button onclick="closeModal()" class="px-8 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-500 font-bold transition-all shadow-md">关闭概览</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 数据核心 ---
+        let events = JSON.parse(localStorage.getItem('style3d_v4_events')) || [];
+        const colorPalette = ['teal', 'indigo', 'yellow', 'rose', 'blue', 'purple', 'green', 'orange'];
+        let currentPhases = [];
+
+        // 初始化
+        renderData();
+        resetForm();
+
+        // --- 排序与数据操作 ---
+        function sortByDate() {
+            if(confirm("确定要按【最早阶段】的开始时间重新排序吗？这将覆盖当前的手动排序。")) {
+                events.sort((a, b) => {
+                    const getStart = (ev) => {
+                        let min = '9999-99-99';
+                        if(ev.phases) ev.phases.forEach(p => {
+                            let t = p.isRange ? p.start : p.date;
+                            if(t && t < min) min = t;
+                        });
+                        return min;
+                    };
+                    return getStart(a) > getStart(b) ? 1 : -1;
+                });
+                saveData();
+                renderData();
+            }
+        }
+
+        function moveEvent(id, direction) {
+            const index = events.findIndex(e => e.id === id);
+            if (index === -1) return;
+            const targetIndex = index + direction;
+            if (targetIndex < 0 || targetIndex >= events.length) return;
+            const temp = events[index];
+            events[index] = events[targetIndex];
+            events[targetIndex] = temp;
+            saveData();
+            renderData();
+        }
+
+        function saveData() {
+            localStorage.setItem('style3d_v4_events', JSON.stringify(events));
+        }
+
+        // --- 视图渲染 ---
+        function renderData() {
+            const searchKw = document.getElementById('globalSearch').value.toLowerCase();
+            let displayEvents = events;
+            if (searchKw) {
+                displayEvents = events.filter(ev => {
+                    let searchStr = `${ev.name} ${ev.mainOwner}`.toLowerCase();
+                    ev.phases.forEach(p => { 
+                        searchStr += ` ${p.name} ${p.owner}`;
+                        p.subtasks.forEach(s => searchStr += ` ${s.name} ${s.owner}`);
+                    });
+                    return searchStr.includes(searchKw);
+                });
+            }
+
+            displayEvents.forEach(calcStatus);
+            renderTimeline(displayEvents);
+            renderTable(displayEvents);
+            renderTodoList();
+        }
+
+        // 渲染时间轴 (动态适应年份+月份虚线)
+        function renderTimeline(data) {
+            const container = document.getElementById('timelineContainer');
+            container.innerHTML = '';
+
+            if (data.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 text-sm py-8">暂无数据</div>';
+                return;
+            }
+
+            // 1. 动态计算最早与最晚的时间范围
+            let minTime = Infinity;
+            let maxTime = -Infinity;
+
+            data.forEach(ev => {
+                ev.phases.forEach(p => {
+                    const s = p.isRange ? p.start : p.date;
+                    const e = p.isRange ? p.end : p.date;
+                    if(s) minTime = Math.min(minTime, new Date(s).getTime());
+                    if(e) maxTime = Math.max(maxTime, new Date(e).getTime());
+                });
+            });
+
+            // 兜底逻辑：如果没有有效日期，显示当前月
+            if (minTime === Infinity) {
+                minTime = new Date().getTime();
+                maxTime = minTime + 30 * 24 * 60 * 60 * 1000;
+            }
+
+            // 扩展至起止月份的开头和结尾，以便绘制完整的月份网格
+            let minDateObj = new Date(minTime);
+            minDateObj.setDate(1);
+            minTime = minDateObj.getTime();
+
+            let maxDateObj = new Date(maxTime);
+            maxDateObj.setMonth(maxDateObj.getMonth() + 1);
+            maxDateObj.setDate(0);
+            maxTime = maxDateObj.getTime();
+            const totalDuration = Math.max(maxTime - minTime, 1); // 防止除0
+
+            // 2. 绘制月份网格行 (头部)
+            const gridRow = document.createElement('div');
+            gridRow.className = "flex relative h-6 mb-2 border-b border-gray-200 text-gray-400 text-[10px] ml-0 md:ml-48";
+            
+            let currMonth = new Date(minTime);
+            while(currMonth.getTime() <= maxTime) {
+                const monthStart = currMonth.getTime();
+                let leftPct = ((monthStart - minTime) / totalDuration) * 100;
+                
+                const label = document.createElement('div');
+                label.className = "absolute font-medium transform -translate-x-1/2 whitespace-nowrap";
+                label.style.left = `${leftPct}%`;
+                label.innerText = `${currMonth.getFullYear()}-${String(currMonth.getMonth()+1).padStart(2, '0')}`;
+                gridRow.appendChild(label);
+
+                currMonth.setMonth(currMonth.getMonth() + 1);
+            }
+            container.appendChild(gridRow);
+
+            // 3. 渲染数据行
+            data.forEach((ev, index) => {
+                const row = document.createElement('div');
+                row.className = "flex flex-col md:flex-row items-center group border-b border-gray-50 pb-2 last:border-0 mt-2";
+                
+                const leftCol = document.createElement('div');
+                leftCol.className = "w-full md:w-48 flex-shrink-0 flex items-center justify-between md:justify-start pr-4 mb-2 md:mb-0 z-10 bg-white";
+                
+                const isFirst = (index === 0);
+                const isLast = (index === data.length - 1);
+                const sortBtns = `
+                    <div class="flex flex-col mr-2 space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onclick="moveEvent('${ev.id}', -1)" class="btn-move text-[10px] px-1 bg-gray-100 text-gray-600 rounded" ${isFirst?'disabled':''}>▲</button>
+                        <button onclick="moveEvent('${ev.id}', 1)" class="btn-move text-[10px] px-1 bg-gray-100 text-gray-600 rounded" ${isLast?'disabled':''}>▼</button>
+                    </div>
+                `;
+                leftCol.innerHTML = `
+                    ${sortBtns}
+                    <div class="truncate text-xs font-bold text-gray-700" title="${ev.name}">
+                        ${ev.name}
+                    </div>
+                `;
+
+                const rightCol = document.createElement('div');
+                rightCol.className = "flex-1 w-full relative h-8 bg-gray-50/30 rounded overflow-hidden border border-gray-100/50";
+                
+                // 绘制行内的竖向虚线
+                let c = new Date(minTime);
+                while(c.getTime() <= maxTime) {
+                    let leftPct = ((c.getTime() - minTime) / totalDuration) * 100;
+                    const vLine = document.createElement('div');
+                    vLine.className = "absolute top-0 bottom-0 border-l border-dashed border-gray-200/60";
+                    vLine.style.left = `${leftPct}%`;
+                    rightCol.appendChild(vLine);
+                    c.setMonth(c.getMonth() + 1);
+                }
+
+                if(ev.phases) {
+                    ev.phases.forEach(p => {
+                        const s = p.isRange ? p.start : p.date;
+                        const e = p.isRange ? p.end : p.date;
+                        if(!s) return;
+
+                        const bar = document.createElement('div');
+                        let leftPct = ((new Date(s).getTime() - minTime) / totalDuration) * 100;
+                        let widthPct = p.isRange ? ((new Date(e).getTime() - new Date(s).getTime()) / totalDuration) * 100 : 0;
+                        
+                        const shapeClass = p.isRange ? "rounded-full" : "rounded-sm border-2 border-white";
+                        
+                        bar.className = `absolute h-4 top-2 ${shapeClass} bg-${p.color}-500 opacity-90 hover:opacity-100 hover:scale-y-125 transition-all cursor-pointer shadow-sm z-10`;
+                        bar.style.left = `${leftPct}%`;
+                        bar.style.width = `${Math.max(widthPct, 0.5)}%`;
+                        bar.style.minWidth = p.isRange ? '8px' : '12px'; 
+                        bar.title = `【${ev.name}】${p.name}: ${s} ${p.isRange ? '至 '+e : ''}`;
+                        
+                        rightCol.appendChild(bar);
+                    });
+                }
+
+                row.appendChild(leftCol);
+                row.appendChild(rightCol);
+                container.appendChild(row);
+            });
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            if (data.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('emptyState').classList.add('hidden');
+            const statusHTML = {
+                'ongoing': `<span class="px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-xs font-bold">进行中</span>`,
+                'not_started': `<span class="px-2 py-1 bg-gray-50 text-gray-500 border border-gray-200 rounded text-xs">未开始</span>`,
+                'ended': `<span class="px-2 py-1 bg-slate-50 text-slate-700 border border-slate-200 rounded text-xs">已结束</span>`
+            };
+            data.forEach((ev, index) => {
+                const phaseTags = ev.phases.map(p => {
+                    const timeStr = p.isRange ? `${(p.start||'').slice(5)}~${(p.end||'').slice(5)}` : (p.date||'').slice(5);
+                    const hasSub = p.subtasks.length > 0 ? `<span class="ml-1 text-[10px] bg-white text-${p.color}-600 px-1.5 rounded-full font-medium border border-${p.color}-100">${p.subtasks.length}</span>` : '';
+                    return `<div class="inline-block mr-2 mb-1 px-2 py-1 bg-${p.color}-50 border border-${p.color}-100 text-${p.color}-700 text-xs rounded">
+                        <span class="font-bold">${p.name}</span> <span class="text-${p.color}-300 mx-0.5">|</span> ${timeStr} ${hasSub}
+                    </div>`;
+                }).join('');
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-brand-50/50 transition-colors group";
+                
+                const isFirst = (index === 0);
+                const isLast = (index === data.length - 1);
+                tr.innerHTML = `
+                    <td class="py-4 px-4 text-center">
+                        <div class="flex flex-col items-center space-y-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                            <button onclick="moveEvent('${ev.id}', -1)" class="w-6 h-6 rounded bg-white border border-gray-200 hover:bg-brand-100 hover:text-brand-700 text-xs" ${isFirst?'disabled':''}>▲</button>
+                            <button onclick="moveEvent('${ev.id}', 1)" class="w-6 h-6 rounded bg-white border border-gray-200 hover:bg-brand-100 hover:text-brand-700 text-xs" ${isLast?'disabled':''}>▼</button>
+                        </div>
+                    </td>
+                    <td class="py-4 px-4">${statusHTML[ev.status]}</td>
+                    <td class="py-4 px-4 font-bold text-brand-900">
+                        <button onclick="showEventDetail('${ev.id}')" class="hover:underline hover:text-brand-600 text-left transition-all truncate max-w-xs block cursor-pointer" title="点击查看完整排期与配置数据">
+                            ${ev.name}
+                        </button>
+                    </td>
+                    <td class="py-4 px-4 text-gray-700 font-medium">${ev.mainOwner || '-'}</td>
+                    <td class="py-4 px-4 flex flex-wrap gap-1">${phaseTags || '<span class="text-gray-400 text-xs">暂无阶段数据</span>'}</td>
+                    <td class="py-4 px-4 text-right whitespace-nowrap">
+                        <button onclick="editEvent('${ev.id}')" class="text-brand-600 hover:text-brand-800 font-bold text-sm mr-4 transition-colors">编辑</button>
+                        <button onclick="deleteEvent('${ev.id}')" class="text-gray-400 hover:text-red-600 font-medium text-sm transition-colors">删除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 渲染待办任务 (含 15天预警与时间段逻辑) ---
+        function renderTodoList() {
+            const container = document.getElementById('todoContainer');
+            const counter = document.getElementById('todoCount');
+            
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const todayTime = new Date(todayStr).getTime();
+            const alertThresholdDays = 15;
+            const alertTimeOffset = alertThresholdDays * 24 * 60 * 60 * 1000;
+            const fifteenDaysLaterTime = todayTime + alertTimeOffset;
+            
+            let tasks = [];
+            events.forEach(ev => {
+                if(!ev.phases) return;
+                ev.phases.forEach(p => {
+                    const startDateStr = p.isRange ? p.start : p.date;
+                    const endDateStr = p.isRange ? p.end : p.date;
+                    
+                    // 只要任务未完成，或者还没过结束日期，就抓取出来
+                    if (endDateStr && (!p.isCompleted || endDateStr >= todayStr)) {
+                        const startTime = startDateStr ? new Date(startDateStr).getTime() : 0;
+                        const endTime = endDateStr ? new Date(endDateStr).getTime() : 0;
+
+                        // 红色提醒判定：1. 距离开始日期不足15天 2. 处于开始和结束日期之间（进行中）
+                        const isUrgent = !p.isCompleted && (
+                            (startTime > 0 && startTime <= fifteenDaysLaterTime) || 
+                            (todayTime >= startTime && todayTime <= endTime)
+                        );
+
+                        tasks.push({ 
+                            eventId: ev.id, phaseId: p.id, subtaskIndex: -1,
+                            eventName: ev.name, taskName: `阶段: ${p.name}`, 
+                            date: p.isRange ? `${startDateStr} ~ ${endDateStr}` : endDateStr,
+                            sortDate: startDateStr || endDateStr, 
+                            owner: p.owner || ev.mainOwner || '-',
+                            isCompleted: p.isCompleted || false,
+                            isUrgent: isUrgent
+                        });
+                    }
+
+                    if(p.subtasks) {
+                        p.subtasks.forEach((st, idx) => {
+                            if (st.deadline && (!st.isCompleted || st.deadline >= todayStr)) {
+                                const deadlineTime = new Date(st.deadline).getTime();
+                                tasks.push({ 
+                                    eventId: ev.id, phaseId: p.id, subtaskIndex: idx,
+                                    eventName: ev.name, taskName: `子任务: ${st.name || '未命名'}`, 
+                                    date: st.deadline,
+                                    sortDate: st.deadline,
+                                    owner: st.owner || p.owner || ev.mainOwner || '-',
+                                    isCompleted: st.isCompleted || false,
+                                    isUrgent: !st.isCompleted && deadlineTime <= fifteenDaysLaterTime // 子任务按截止日期15天预警
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+
+            // 排序：先按日期
+            tasks.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+            counter.innerText = `${tasks.length} 项`;
+            
+            if (tasks.length === 0) {
+                container.innerHTML = `<div class="text-center text-sm text-gray-400 py-10">近期暂无待办任务</div>`;
+                return;
+            }
+            
+            let html = '';
+            tasks.forEach(t => {
+                const cardClass = t.isUrgent ? 'border-red-200 bg-red-50/60 shadow-sm' : 'border-gray-200 bg-white hover:border-brand-300 shadow-sm hover:shadow';
+                const dateClass = t.isUrgent ? 'text-red-600 font-bold' : 'text-brand-600 font-medium';
+                const tagHtml = t.isUrgent ? `<span class="px-1.5 py-0.5 bg-red-500 text-white rounded text-[10px] font-bold shadow-sm whitespace-nowrap">需关注</span>` : '';
+                const completedClass = t.isCompleted ? 'opacity-50 grayscale' : '';
+                const textStyle = t.isCompleted ? 'line-through text-gray-400' : 'text-gray-800';
+
+                html += `
+                    <div class="p-3.5 rounded-xl border ${cardClass} transition-all ${completedClass}">
+                        <div class="flex justify-between items-start mb-1.5 gap-2">
+                            <div class="flex items-start gap-2">
+                                <input type="checkbox" ${t.isCompleted ? 'checked' : ''} 
+                                       onchange="toggleTodoStatus('${t.eventId}', '${t.phaseId}', ${t.subtaskIndex}, this.checked)" 
+                                       class="mt-0.5 w-4 h-4 text-brand-600 rounded border-gray-300 focus:ring-brand-500 cursor-pointer shadow-sm">
+                                <div class="font-bold text-sm line-clamp-1 ${textStyle}" title="${t.eventName}">${t.eventName}</div>
+                            </div>
+                            ${tagHtml}
+                        </div>
+                        <div class="text-xs ${t.isCompleted ? 'text-gray-400' : 'text-gray-600'} mb-3 font-medium bg-white/60 p-1.5 rounded border border-white ml-6">${t.taskName}</div>
+                        <div class="flex justify-between items-center text-xs ml-6">
+                            <div class="text-gray-500 flex items-center gap-1">
+                                <span class="bg-gray-100 px-2 py-0.5 rounded text-gray-600 border border-gray-200">${t.owner}</span>
+                            </div>
+                            <span class="${dateClass} bg-white px-2 py-0.5 rounded-full border ${t.isUrgent ? 'border-red-100' : 'border-brand-100'}">${t.date}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // 待办复选框交互
+        function toggleTodoStatus(eventId, phaseId, subtaskIndex, isChecked) {
+            const ev = events.find(e => e.id === eventId);
+            if (!ev) return;
+            const phase = ev.phases.find(p => p.id === phaseId);
+            if (!phase) return;
+
+            if (subtaskIndex === -1) {
+                phase.isCompleted = isChecked;
+            } else {
+                phase.subtasks[subtaskIndex].isCompleted = isChecked;
+            }
+            saveData();
+            renderTodoList(); 
+        }
+
+        // --- 模态框逻辑 ---
+        function showEventDetail(id) {
+            const ev = events.find(e => e.id === id);
+            if (!ev) return;
+            
+            document.getElementById('modalTitle').innerText = ev.name;
+            document.getElementById('modalOwner').innerText = `总负责人: ${ev.mainOwner || '暂缺'}`;
+            
+            let html = '';
+            if (ev.notes) {
+                html += `
+                    <div class="mb-6">
+                        <h3 class="text-sm font-bold text-gray-800 border-l-4 border-brand-500 pl-2 mb-2">全局备注信息</h3>
+                        <div class="text-sm text-gray-600 bg-gray-50/50 p-4 rounded-xl border border-gray-100 leading-relaxed">${ev.notes.replace(/\n/g, '<br>')}</div>
+                    </div>
+                `;
+            }
+            
+            html += `<h3 class="text-sm font-bold text-gray-800 border-l-4 border-brand-500 pl-2 mb-4">排期与任务执行明细</h3>`;
+            if (ev.phases && ev.phases.length > 0) {
+                html += `<div class="space-y-4">`;
+                ev.phases.forEach(p => {
+                    const timeStr = p.isRange ? `${p.start || '待定'} 至 ${p.end || '待定'}` : (p.date || '待定');
+                    
+                    let subHtml = '';
+                    if (p.subtasks && p.subtasks.length > 0) {
+                        subHtml = `<div class="mt-3 space-y-2 border-t border-${p.color}-200/50 pt-3">`;
+                        p.subtasks.forEach(st => {
+                            subHtml += `
+                                <div class="flex flex-col sm:flex-row justify-between sm:items-center bg-white border border-${p.color}-100 p-2.5 rounded-lg text-xs hover:shadow-sm transition-shadow gap-2 ${st.isCompleted ? 'opacity-60' : ''}">
+                                    <span class="font-medium text-gray-700 flex items-center before:content-[''] before:w-1.5 before:h-1.5 before:bg-${p.color}-400 before:rounded-full before:mr-2 ${st.isCompleted ? 'line-through' : ''}">${st.name || '未命名任务'}</span>
+                                    <div class="flex gap-3 text-gray-500">
+                                        <span class="bg-gray-50 px-2 py-0.5 rounded border border-gray-100">责: ${st.owner || '-'}</span>
+                                        <span class="text-${p.color}-700 font-bold bg-${p.color}-50 px-2 py-0.5 rounded border border-${p.color}-100">截止: ${st.deadline || '-'}</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        subHtml += `</div>`;
+                    }
+                    
+                    html += `
+                        <div class="bg-${p.color}-50/30 border border-${p.color}-200 rounded-xl p-4 transition-colors hover:bg-${p.color}-50/60 ${p.isCompleted ? 'opacity-60' : ''}">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                <div class="flex items-center gap-3">
+                                    <span class="font-bold text-${p.color}-800 text-base ${p.isCompleted ? 'line-through' : ''}">${p.name}</span>
+                                    <span class="text-xs bg-white text-gray-600 px-2.5 py-1 rounded-md shadow-sm border border-gray-100 flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-${p.color}-400"></span> ${timeStr}
+                                    </span>
+                                </div>
+                                <span class="text-sm font-medium text-${p.color}-700 bg-white px-3 py-1 rounded-lg border border-${p.color}-100 shadow-sm">
+                                    阶段负责人: ${p.owner || '-'}
+                                </span>
+                            </div>
+                            ${subHtml}
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            } else {
+                html += `<div class="text-sm text-gray-400 text-center py-6 bg-gray-50 rounded-xl border border-gray-100">该赛事暂无划分排期阶段</div>`;
+            }
+            
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('eventDetailModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('eventDetailModal').classList.add('hidden');
+        }
+
+        function calcStatus(ev) {
+            if(!ev.phases || ev.phases.length === 0) { ev.status = 'not_started'; return; }
+            const today = new Date().toISOString().split('T')[0];
+            let minDate = '9999-12-31', maxDate = '0000-00-00';
+            ev.phases.forEach(p => {
+                const s = p.isRange ? p.start : p.date;
+                const e = p.isRange ? p.end : p.date;
+                if(s && s < minDate) minDate = s;
+                if(e && e > maxDate) maxDate = e;
+            });
+            if(minDate === '9999-12-31') ev.status = 'not_started';
+            else if (today < minDate) ev.status = 'not_started';
+            else if (today > maxDate) ev.status = 'ended';
+            else ev.status = 'ongoing';
+        }
+
+        // --- 表单交互逻辑 ---
+        function resetForm() {
+            document.getElementById('eventForm').reset();
+            document.getElementById('editId').value = '';
+            currentPhases = [
+                { id: generateId(), name: '报名期', isRange: true, start: '', end: '', owner: '', color: 'teal', subtasks: [], isCompleted: false },
+                { id: generateId(), name: '初赛评审', isRange: true, start: '', end: '', owner: '', color: 'indigo', subtasks: [], isCompleted: false },
+                { id: generateId(), name: '入围公告', isRange: false, date: '', owner: '', color: 'yellow', subtasks: [], isCompleted: false },
+                { id: generateId(), name: '决赛及活动', isRange: true, start: '', end: '', owner: '', color: 'rose', subtasks: [], isCompleted: false }
+            ];
+            renderFormPhases();
+        }
+
+        function renderFormPhases() {
+            const container = document.getElementById('phasesContainer');
+            container.innerHTML = '';
+            currentPhases.forEach((phase, index) => {
+                const isRange = phase.isRange;
+                const c = phase.color;
+                
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-xl border border-${c}-200 bg-${c}-50 relative transition-all group`;
+
+                let timeInputsHtml = isRange 
+                    ? `<input type="date" class="w-full text-xs p-2 rounded border border-gray-300 focus:border-brand-500 focus:outline-none" value="${phase.start}" onchange="updatePhase(${index}, 'start', this.value)">
+                       <span class="text-gray-400">-</span>
+                       <input type="date" class="w-full text-xs p-2 rounded border border-gray-300 focus:border-brand-500 focus:outline-none" value="${phase.end}" onchange="updatePhase(${index}, 'end', this.value)">`
+                    : `<input type="date" class="w-full text-xs p-2 rounded border border-gray-300 focus:border-brand-500 focus:outline-none" value="${phase.date||''}" onchange="updatePhase(${index}, 'date', this.value)">`;
+
+                let subtasksHtml = phase.subtasks.map((st, stIndex) => `
+                    <div class="flex flex-col md:flex-row gap-2 mt-2 pl-4 border-l-2 border-${c}-300">
+                        <input type="text" placeholder="子任务" class="flex-1 text-xs p-1.5 border border-gray-200 rounded focus:border-brand-500 focus:outline-none" value="${st.name}" onchange="updateSubtask(${index}, ${stIndex}, 'name', this.value)">
+                        <input type="text" placeholder="负责人" class="w-full md:w-20 text-xs p-1.5 border border-gray-200 rounded focus:border-brand-500 focus:outline-none" value="${st.owner}" onchange="updateSubtask(${index}, ${stIndex}, 'owner', this.value)">
+                        <input type="date" class="w-full md:w-28 text-xs p-1.5 border border-gray-200 rounded focus:border-brand-500 focus:outline-none" value="${st.deadline}" onchange="updateSubtask(${index}, ${stIndex}, 'deadline', this.value)">
+                        <button type="button" onclick="removeSubtask(${index}, ${stIndex})" class="text-red-400 hover:text-red-600 font-bold px-2 text-lg leading-none" title="移除任务">×</button>
+                    </div>
+                `).join('');
+
+                card.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-3">
+                        <div class="flex items-center w-full md:w-auto">
+                            <div class="flex flex-col mr-2 bg-white rounded border border-gray-200 overflow-hidden shadow-sm">
+                                <button type="button" onclick="movePhase(${index}, -1)" class="px-1.5 text-xs text-gray-500 hover:bg-gray-100 border-b border-gray-200" ${index === 0 ? 'disabled style="opacity:0.3"' : ''}>▲</button>
+                                <button type="button" onclick="movePhase(${index}, 1)" class="px-1.5 text-xs text-gray-500 hover:bg-gray-100" ${index === currentPhases.length - 1 ? 'disabled style="opacity:0.3"' : ''}>▼</button>
+                            </div>
+                            <input type="text" class="font-bold bg-transparent border-b border-dashed border-gray-400 focus:border-brand-500 focus:outline-none text-${c}-700 w-32 md:w-40 px-1" value="${phase.name}" onchange="updatePhase(${index}, 'name', this.value)">
+                            <select class="ml-2 text-xs bg-white border border-gray-200 rounded p-1 text-gray-500 focus:border-brand-500 focus:outline-none" onchange="togglePhaseType(${index}, this.value)">
+                                <option value="range" ${isRange ? 'selected' : ''}>时间段</option>
+                                <option value="date" ${!isRange ? 'selected' : ''}>单日截点</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 w-full md:w-auto">
+                            ${timeInputsHtml}
+                            <input type="text" placeholder="阶段负责人" class="w-full md:w-24 text-xs p-2 rounded border border-gray-300 bg-white focus:border-brand-500 focus:outline-none" value="${phase.owner}" onchange="updatePhase(${index}, 'owner', this.value)">
+                            <button type="button" onclick="removePhase(${index})" class="text-gray-400 hover:text-red-500 ml-2 text-xl font-light leading-none" title="删除当前阶段">×</button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-xs font-bold text-gray-500 mb-1 flex justify-between items-center">
+                            <span>子任务清单</span>
+                            <button type="button" onclick="addSubtask(${index})" class="text-${c}-600 hover:text-${c}-800 hover:underline transition-colors">+ 添加任务</button>
+                        </div>
+                        ${subtasksHtml}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updatePhase(idx, key, val) { currentPhases[idx][key] = val; }
+        function togglePhaseType(idx, type) { currentPhases[idx].isRange = (type === 'range'); renderFormPhases(); }
+        function movePhase(idx, dir) {
+            if (idx + dir < 0 || idx + dir >= currentPhases.length) return;
+            const temp = currentPhases[idx];
+            currentPhases[idx] = currentPhases[idx + dir];
+            currentPhases[idx + dir] = temp;
+            renderFormPhases();
+        }
+        function addPhase() {
+            const color = colorPalette[currentPhases.length % colorPalette.length];
+            currentPhases.push({ id: generateId(), name: '新阶段', isRange: true, start: '', end: '', owner: '', color: color, subtasks: [], isCompleted: false });
+            renderFormPhases();
+        }
+        function removePhase(idx) { if(confirm('确定删除此排期阶段吗？')) { currentPhases.splice(idx, 1); renderFormPhases(); }}
+        
+        function addSubtask(idx) { currentPhases[idx].subtasks.push({ name: '', owner: '', deadline: '', isCompleted: false }); renderFormPhases(); }
+        function updateSubtask(pIdx, sIdx, key, val) { currentPhases[pIdx].subtasks[sIdx][key] = val; }
+        function removeSubtask(pIdx, sIdx) { currentPhases[pIdx].subtasks.splice(sIdx, 1); renderFormPhases(); }
+
+        function saveEvent() {
+            const name = document.getElementById('name').value.trim();
+            const owner = document.getElementById('main_owner').value.trim();
+            if(!name || !owner) { alert("【大赛名称】和【总负责人】为必填项"); return; }
+            
+            for (let i = 0; i < currentPhases.length; i++) {
+                const p = currentPhases[i];
+                if (p.isRange && p.start && p.end && p.start > p.end) {
+                    alert(`校验失败：阶段【${p.name}】的结束时间不能早于开始时间！`);
+                    return;
+                }
+            }
+            
+            const id = document.getElementById('editId').value || generateId();
+            const ev = {
+                id: id,
+                name: name,
+                mainOwner: owner,
+                notes: document.getElementById('notes').value,
+                phases: JSON.parse(JSON.stringify(currentPhases))
+            };
+
+            const idx = events.findIndex(e => e.id === id);
+            if (idx >= 0) events[idx] = ev;
+            else events.push(ev);
+
+            saveData();
+            resetForm();
+            renderData();
+            alert("赛事排期数据保存成功！");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function editEvent(id) {
+            const ev = events.find(e => e.id === id);
+            if(!ev) return;
+            document.getElementById('editId').value = ev.id;
+            document.getElementById('name').value = ev.name;
+            document.getElementById('main_owner').value = ev.mainOwner;
+            document.getElementById('notes').value = ev.notes;
+            currentPhases = JSON.parse(JSON.stringify(ev.phases || []));
+            renderFormPhases();
+            document.querySelector('#eventFormSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function deleteEvent(id) {
+            if(confirm("确定永久删除该赛事的所有配置及排期数据吗？")) {
+                events = events.filter(e => e.id !== id);
+                saveData();
+                renderData();
+            }
+        }
+
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+
+        function exportExcel() {
+            if (events.length === 0) { alert("当前无数据可导出"); return; }
+            let csv = "data:text/csv;charset=utf-8,\uFEFF";
+            csv += "大赛名称,总负责人,阶段明细,备注\n";
+            events.forEach(ev => {
+                let pText = ev.phases.map(p => `[${p.name}] ${p.isRange ? p.start+'~'+p.end : p.date} (${p.owner})`).join("; ");
+                let row = [ev.name, ev.mainOwner, pText, ev.notes].map(f => `"${(f||'').replace(/"/g, '""')}"`).join(",");
+                csv += row + "\n";
+            });
+            const link = document.createElement("a");
+            link.href = encodeURI(csv);
+            link.download = `Style3D_EDU_Events_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
